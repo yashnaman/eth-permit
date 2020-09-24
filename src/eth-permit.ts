@@ -1,7 +1,8 @@
-import { getChainId, call, signData, RSV } from './rpc';
-import { hexToUtf8 } from './lib';
+import { getChainId, call, signData, RSV } from "./rpc";
+import { hexToUtf8 } from "./lib";
 
-const MAX_INT = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+const MAX_INT =
+  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
 interface DaiPermitMessage {
   holder: string;
@@ -26,9 +27,22 @@ interface Domain {
   verifyingContract: string;
 }
 
+interface UNIDomain {
+  name: string;
+  // version: string;
+  chainId: number;
+  verifyingContract: string;
+}
+
 const EIP712Domain = [
   { name: "name", type: "string" },
   { name: "version", type: "string" },
+  { name: "chainId", type: "uint256" },
+  { name: "verifyingContract", type: "address" },
+];
+const EIP712UNIDomain = [
+  { name: "name", type: "string" },
+  // { name: "version", type: "string" },
   { name: "chainId", type: "uint256" },
   { name: "verifyingContract", type: "address" },
 ];
@@ -53,7 +67,10 @@ const createTypedDaiData = (message: DaiPermitMessage, domain: Domain) => {
   return typedData;
 };
 
-const createTypedERC2612Data = (message: ERC2612PermitMessage, domain: Domain) => {
+const createTypedERC2612Data = (
+  message: ERC2612PermitMessage,
+  domain: Domain
+) => {
   const typedData = {
     types: {
       EIP712Domain,
@@ -72,18 +89,42 @@ const createTypedERC2612Data = (message: ERC2612PermitMessage, domain: Domain) =
 
   return typedData;
 };
+const createTypedUNIData = (
+  message: ERC2612PermitMessage,
+  domain: UNIDomain
+) => {
+  const typedData = {
+    types: {
+      EIP712Domain: EIP712UNIDomain,
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+      ],
+    },
+    primaryType: "Permit",
+    domain,
+    message,
+  };
 
-const NONCES_FN = '0x7ecebe00';
-const NAME_FN = '0x06fdde03';
+  return typedData;
+};
 
-const zeros = (numZeros: number) => ''.padEnd(numZeros, '0');
+const NONCES_FN = "0x7ecebe00";
+const NAME_FN = "0x06fdde03";
+
+const zeros = (numZeros: number) => "".padEnd(numZeros, "0");
 
 const getTokenName = async (provider: any, address: string) =>
   hexToUtf8((await call(provider, address, NAME_FN)).substr(130));
 
-
-const getDomain = async (provider: any, token: string | Domain): Promise<Domain> => {
-  if (typeof token !== 'string') {
+const getDomain = async (
+  provider: any,
+  token: string | Domain
+): Promise<Domain> => {
+  if (typeof token !== "string") {
     return token as Domain;
   }
 
@@ -94,7 +135,35 @@ const getDomain = async (provider: any, token: string | Domain): Promise<Domain>
     getChainId(provider),
   ]);
 
-  const domain: Domain = { name, version: '1', chainId, verifyingContract: tokenAddress };
+  const domain: Domain = {
+    name,
+    version: "1",
+    chainId,
+    verifyingContract: tokenAddress,
+  };
+  return domain;
+};
+const getUNIDomain = async (
+  provider: any,
+  token: string | Domain
+): Promise<UNIDomain> => {
+  if (typeof token !== "string") {
+    return token as UNIDomain;
+  }
+
+  const tokenAddress = token as string;
+
+  const [name, chainId] = await Promise.all([
+    getTokenName(provider, tokenAddress),
+    getChainId(provider),
+  ]);
+  //no version in uni
+  const domain: UNIDomain = {
+    name,
+    // version: "1",
+    chainId,
+    verifyingContract: tokenAddress,
+  };
   return domain;
 };
 
@@ -105,15 +174,21 @@ export const signDaiPermit = async (
   spender: string,
   expiry?: number,
   nonce?: number,
-  allowed?:boolean
+  allowed?: boolean
 ): Promise<DaiPermitMessage & RSV> => {
-  const tokenAddress = (token as Domain).verifyingContract || token as string;
-  if(allowed == undefined) allowed = true;
+  const tokenAddress = (token as Domain).verifyingContract || (token as string);
+  if (allowed == undefined) allowed = true;
   else allowed = false;
   const message: DaiPermitMessage = {
     holder,
     spender,
-    nonce: nonce || await call(provider, tokenAddress, `${NONCES_FN}${zeros(24)}${holder.substr(2)}`),
+    nonce:
+      nonce ||
+      (await call(
+        provider,
+        tokenAddress,
+        `${NONCES_FN}${zeros(24)}${holder.substr(2)}`
+      )),
     expiry: expiry || MAX_INT,
     allowed: allowed,
   };
@@ -132,20 +207,58 @@ export const signERC2612Permit = async (
   spender: string,
   value: string | number = MAX_INT,
   deadline?: number,
-  nonce?: number,
+  nonce?: number
 ): Promise<ERC2612PermitMessage & RSV> => {
-  const tokenAddress = (token as Domain).verifyingContract || token as string;
+  const tokenAddress = (token as Domain).verifyingContract || (token as string);
 
   const message: ERC2612PermitMessage = {
     owner,
     spender,
     value,
-    nonce: nonce || await call(provider, tokenAddress, `${NONCES_FN}${zeros(24)}${owner.substr(2)}`),
+    nonce:
+      nonce ||
+      (await call(
+        provider,
+        tokenAddress,
+        `${NONCES_FN}${zeros(24)}${owner.substr(2)}`
+      )),
     deadline: deadline || MAX_INT,
   };
 
   const domain = await getDomain(provider, token);
   const typedData = createTypedERC2612Data(message, domain);
+  const sig = await signData(provider, owner, typedData);
+
+  return { ...sig, ...message };
+};
+
+export const signUNIPermit = async (
+  provider: any,
+  token: string | Domain,
+  owner: string,
+  spender: string,
+  value: string | number = MAX_INT,
+  deadline?: number,
+  nonce?: number
+): Promise<ERC2612PermitMessage & RSV> => {
+  const tokenAddress = (token as Domain).verifyingContract || (token as string);
+
+  const message: ERC2612PermitMessage = {
+    owner,
+    spender,
+    value,
+    nonce:
+      nonce ||
+      (await call(
+        provider,
+        tokenAddress,
+        `${NONCES_FN}${zeros(24)}${owner.substr(2)}`
+      )),
+    deadline: deadline || MAX_INT,
+  };
+
+  const domain = await getUNIDomain(provider, token);
+  const typedData = createTypedUNIData(message, domain);
   const sig = await signData(provider, owner, typedData);
 
   return { ...sig, ...message };
