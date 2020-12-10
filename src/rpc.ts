@@ -51,7 +51,8 @@ export const signData = async (
   };
 };
 
-let chainIdOverride = 1;
+let chainIdOverride: null | number = null;
+// let chainIdOverride = 1; //when working with ganache
 export const setChainIdOverride = (id: number) => {
   chainIdOverride = id;
 };

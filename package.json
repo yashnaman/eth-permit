@@ -1,6 +1,6 @@
 {
-  "name": "eth-permit",
-  "version": "0.1.7",
+  "name": "eth-permit-custom",
+  "version": "0.0.0",
   "description": "Sign permit messages for Ethereum tokens",
   "main": "dist/eth-permit.js",
   "types": "dist/eth-permit.d.ts",
@@ -8,10 +8,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dmihal/eth-permit.git"
+    "url": "git+https://github.com/yashnaman/eth-permit.git"
   },
   "bugs": {
-    "url": "https://github.com/dmihal/eth-permit/issues"
+    "url": "https://github.com/yashnaman/eth-permit/issues"
   },
   "scripts": {
     "build": "tsc",

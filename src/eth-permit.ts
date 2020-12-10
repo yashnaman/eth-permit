@@ -178,7 +178,7 @@ export const signDaiPermit = async (
 ): Promise<DaiPermitMessage & RSV> => {
   const tokenAddress = (token as Domain).verifyingContract || (token as string);
   if (allowed == undefined) allowed = true;
-  else allowed = false;
+  else allowed = allowed;
   const message: DaiPermitMessage = {
     holder,
     spender,
@@ -192,6 +192,7 @@ export const signDaiPermit = async (
     expiry: expiry || MAX_INT,
     allowed: allowed,
   };
+  console.log(message);
 
   const domain = await getDomain(provider, token);
   const typedData = createTypedDaiData(message, domain);
