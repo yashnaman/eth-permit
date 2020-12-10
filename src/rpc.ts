@@ -38,12 +38,19 @@ export const signData = async (
   fromAddress: string,
   typeData: any
 ): Promise<RSV> => {
-  const _typeData =
+  const typeDataString =
     typeof typeData === "string" ? typeData : JSON.stringify(typeData);
   const result = await send(provider, "eth_signTypedData_v4", [
     fromAddress,
-    _typeData,
-  ]);
+    typeDataString,
+  ]).catch((error: any) => {
+    if (error.message === "Method eth_signTypedData_v4 not supported.") {
+      return send(provider, "eth_signTypedData", [fromAddress, typeData]);
+    } else {
+      throw error;
+    }
+  });
+
   return {
     r: result.slice(0, 66),
     s: "0x" + result.slice(66, 130),
